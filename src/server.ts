@@ -21,7 +21,7 @@ import {
 } from "./waggle.ts";
 import { buildTreeMap } from "./tree.ts";
 import { rawContentType, isImageExt, badgeLabel } from "./contenttype.ts";
-import { page, errorPage, breadcrumbs, treeSidebar, outlineSidebar, symbolSidebar, formatBytes, setCurrentToken } from "./layout.ts";
+import { page, errorPage, breadcrumbs, treeSidebar, outlineSidebar, symbolSidebar, formatBytes, setCurrentToken, setBasePath, bp } from "./layout.ts";
 import { ext, escapeHtml } from "./util.ts";
 import { renderMarkdown } from "./render/markdown.ts";
 import { renderCode, renderCodeBlock, langFromExt } from "./render/code.ts";
@@ -32,6 +32,10 @@ import { renderPreview } from "./render/preview.ts";
 import { renderFolder } from "./render/folder.ts";
 
 let currentToken = "";
+
+export function setBasePathConfig(path: string): void {
+  setBasePath(path);
+}
 
 export function createServer(port: number, host: string) {
   return Bun.serve({
@@ -44,10 +48,13 @@ export function createServer(port: number, host: string) {
       console.log(`${t} ${req.method} ${path}`);
 
       if (req.method !== "GET") return new Response("method not allowed", { status: 405 });
-      if (path === "/") return dashboard();
+      // Note: reverse proxies (e.g. Tailscale Serve --set-path) strip the path
+      // prefix before forwarding. So we match on the stripped path, but generate
+      // links with the basePath prefix (via bp()).
+      if (path === "/" || path === "") return dashboard();
       if (path === "/health") return health();
 
-      const segments = path.slice(1).split("/").filter(Boolean);
+      const segments = path.replace(/^\/+/, "").split("/").filter(Boolean);
       if (segments.length >= 1 && /^[A-Za-z0-9]{6,12}$/.test(segments[0])) {
         const token = segments[0];
         currentToken = token;
@@ -96,7 +103,7 @@ async function dashboard(): Promise<Response> {
   const items = tokens.slice(0, 20).map((t) => {
     const date = new Date(t.minted_at * 1000).toLocaleString();
     const tags = Object.entries(t.tags).map(([k, v]) => `<span class="badge">${escapeHtml(k)}=${escapeHtml(v)}</span>`).join("");
-    return `<li><a href="/${t.token}">${t.token}</a> <span class="dim">${escapeHtml(t.target)}</span> <span class="dim">${date}</span> ${tags}</li>`;
+    return `<li><a href="${bp(`/${t.token}`)}">${t.token}</a> <span class="dim">${escapeHtml(t.target)}</span> <span class="dim">${date}</span> ${tags}</li>`;
   }).join("");
   return new Response(
     page("waggle viewer", `<h1>waggle viewer</h1><p class="dim">${tokens.length} tokens</p><ul>${items}</ul>`),
@@ -135,7 +142,7 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
         page(`token ${token}`,
           breadcrumbs(token) +
           `<p class="meta"><span class="badge">${badgeLabel(ov.content_type)}</span> ${formatBytes(ov.total_bytes ?? 0)}</p>` +
-          `<img src="/${token}/raw" style="max-width:100%;border-radius:6px">`),
+          `<img src="${bp(`/${token}/raw`)}" style="max-width:100%;border-radius:6px">`),
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
     }
@@ -192,7 +199,7 @@ async function serveFolder(token: string, ov: WaggleOverview): Promise<Response>
   // Check for index.html (offer preview)
   const hasIndex = (ov.children ?? []).some((c) => c.name === "index.html");
   const previewBtn = hasIndex
-    ? `<a class="preview-btn" href="/${token}/preview" target="_blank">Preview site →</a>`
+    ? `<a class="preview-btn" href="${bp(`/${token}/preview`)}" target="_blank">Preview site →</a>`
     : "";
 
   // Render all files inline on one scrollable page
@@ -219,7 +226,7 @@ async function serveFile(token: string, fileName: string, raw: boolean): Promise
         page(`${fileName} · ${token}`,
           breadcrumbs(token, fileName) +
           `<p class="meta">${escapeHtml(fileName)}</p>` +
-          `<img src="/${token}/file/${encodeURIComponent(fileName)}/raw" style="max-width:100%;border-radius:6px">`,
+          `<img src="${bp(`/${token}/file/${encodeURIComponent(fileName)}/raw`)}" style="max-width:100%;border-radius:6px">`,
           await getFileSidebar(token, fileName)),
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
@@ -257,7 +264,7 @@ async function serveFile(token: string, fileName: string, raw: boolean): Promise
       { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (fileExt === "html" || fileExt === "htm") {
-    const previewLink = `<a class="preview-btn" href="/${token}/preview/${encodeURIComponent(fileName)}" target="_blank">Live preview →</a>`;
+    const previewLink = `<a class="preview-btn" href="${bp(`/${token}/preview/${encodeURIComponent(fileName)}`)}" target="_blank">Live preview →</a>`;
     const codeHtml = await renderCode(text, "html");
     return new Response(page(`${fileName} · ${token}`, bc + meta + previewLink + codeHtml, sidebar),
       { headers: { "content-type": "text/html; charset=utf-8" } });
@@ -329,7 +336,7 @@ async function serveSearch(token: string, query: string): Promise<Response> {
   return new Response(
     page(`search: ${query} · ${token}`,
       breadcrumbs(token, `search: ${query}`) +
-      `<div class="search-bar"><form action="/${token}/search" method="get"><input name="q" value="${escapeHtml(query)}" placeholder="search..."><button>search</button></form></div>` +
+      `<div class="search-bar"><form action="${bp(`/${token}/search`)}" method="get"><input name="q" value="${escapeHtml(query)}" placeholder="search..."><button>search</button></form></div>` +
       `<p class="meta">${matches.length} matches</p>${results}`),
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );

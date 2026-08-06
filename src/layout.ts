@@ -11,6 +11,20 @@
 import { escapeHtml } from "./util.ts";
 import type { WaggleOverview, WaggleTreeChild, WaggleTreeDir } from "./waggle.ts";
 
+/** Base path for URL generation — set when mounted behind a reverse proxy at a subpath. */
+let basePath = "";
+
+/** Prefix a path with the base path. Ensures no double slashes. */
+export function bp(path: string): string {
+  if (!basePath) return path;
+  const clean = path.startsWith("/") ? path : `/${path}`;
+  return basePath + clean;
+}
+
+export function setBasePath(path: string): void {
+  basePath = path.replace(/\/+$/, "");
+}
+
 export function page(title: string, body: string, sidebar = "", breadcrumbs = ""): string {
   const layoutClass = sidebar ? "has-sidebar" : "no-sidebar";
   const sidebarHtml = sidebar
@@ -198,16 +212,16 @@ ${body}
 
 export function errorPage(msg: string): string {
   return page("error", `<p style="color:var(--err)">error: ${escapeHtml(msg)}</p>
-<p><a href="/">&larr; back to dashboard</a></p>`);
+<p><a href="${bp("/")}">&larr; back to dashboard</a></p>`);
 }
 
 /** Build breadcrumbs for a token + optional file path. */
 export function breadcrumbs(token: string, fileName?: string, subdirPath?: string): string {
-  const parts: string[] = [`<a href="/">dashboard</a>`];
+  const parts: string[] = [`<a href="${bp("/")}">dashboard</a>`];
   if (subdirPath) {
-    parts.push(`<a href="/${token}">${escapeHtml(subdirPath)}</a>`);
+    parts.push(`<a href="${bp(`/${token}`)}">${escapeHtml(subdirPath)}</a>`);
   } else {
-    parts.push(`<a href="/${token}">${token}</a>`);
+    parts.push(`<a href="${bp(`/${token}`)}">${token}</a>`);
   }
   if (fileName) {
     parts.push(`<span>${escapeHtml(fileName)}</span>`);
@@ -224,11 +238,11 @@ export function treeSidebar(
   const fileItems = (ov.children ?? []).map((child) => {
     const active = currentFile === child.name ? " active" : "";
     const size = formatBytes(child.bytes);
-    return `<li class="file-item${active}"><a href="/${token}/file/${encodeURIComponent(child.name)}" title="${escapeHtml(child.content_type)} · ${size}">${escapeHtml(child.name)}</a></li>`;
+    return `<li class="file-item${active}"><a href="${bp(`/${token}/file/${encodeURIComponent(child.name)}`)}" title="${escapeHtml(child.content_type)} · ${size}">${escapeHtml(child.name)}</a></li>`;
   }).join("");
 
   const dirItems = (ov.dirs ?? []).map((dir) => {
-    return `<li class="dir-item"><a href="/${dir.token}">${escapeHtml(dir.name)}/</a></li>`;
+    return `<li class="dir-item"><a href="${bp(`/${dir.token}`)}">${escapeHtml(dir.name)}/</a></li>`;
   }).join("");
 
   let html = "";
@@ -255,7 +269,7 @@ export function outlineSidebar(
 export function symbolSidebar(ov: WaggleOverview): string {
   if (!ov.symbols?.symbols?.length) return "";
   const items = ov.symbols.symbols.map((s) => {
-    return `<li class="h${Math.min(s.depth + 1, 4)}"><a href="/${currentToken}/symbol/${encodeURIComponent(s.name)}">${escapeHtml(s.name)}</a></li>`;
+    return `<li class="h${Math.min(s.depth + 1, 4)}"><a href="${bp(`/${currentToken}/symbol/${encodeURIComponent(s.name)}`)}">${escapeHtml(s.name)}</a></li>`;
   }).join("");
   return `<h3>symbols</h3><ul>${items}</ul>`;
 }

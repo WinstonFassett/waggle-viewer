@@ -7,6 +7,7 @@
 
 import { readFile } from "../waggle.ts";
 import { buildTreeMap, resolveRelativePath } from "../tree.ts";
+import { bp } from "../layout.ts";
 
 export async function renderPreview(
   token: string,
@@ -45,7 +46,7 @@ export async function renderPreview(
       }
     }
     if (ownerToken) {
-      return `${attr}="/${ownerToken}/file/${encodeURIComponent(fileName)}/raw"`;
+      return `${attr}="${bp(`/${ownerToken}/file/${encodeURIComponent(fileName)}/raw`)}"`;
     }
     return match;
   });

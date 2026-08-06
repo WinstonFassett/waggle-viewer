@@ -8,6 +8,7 @@
 import { marked } from "marked";
 import { findOwnerToken } from "../tree.ts";
 import { escapeHtml } from "../util.ts";
+import { bp } from "../layout.ts";
 
 marked.setOptions({
   gfm: true,
@@ -62,12 +63,12 @@ function resolveUrl(url: string, token: string, treeMap?: Map<string, string>): 
       const fileName = cleanUrl.includes("/")
         ? cleanUrl.slice(cleanUrl.lastIndexOf("/") + 1)
         : cleanUrl;
-      return `/${owner}/file/${encodeURIComponent(fileName)}/raw`;
+      return bp(`/${owner}/file/${encodeURIComponent(fileName)}/raw`);
     }
   }
 
   // Fallback: assume file is in the same directory as the markdown
-  return `/${token}/file/${encodeURIComponent(cleanUrl)}/raw`;
+  return bp(`/${token}/file/${encodeURIComponent(cleanUrl)}/raw`);
 }
 
 /** Extract headings from markdown for outline (used when waggle overview has no outline). */

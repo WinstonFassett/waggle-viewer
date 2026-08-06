@@ -18,7 +18,7 @@ import { renderCode } from "./code.ts";
 import { renderJson } from "./json.ts";
 import { isCsv, renderCsv } from "./csv.ts";
 import { serveFolderImage } from "./image.ts";
-import { formatBytes } from "../layout.ts";
+import { formatBytes, bp } from "../layout.ts";
 
 export interface FolderRenderResult {
   html: string;
@@ -64,7 +64,7 @@ ${content}
     navItems.push(`<li><a href="#${id}" class="nav-link" data-target="${id}">📁 ${escapeHtml(dir.name)}/</a></li>`);
     sections.push(`<section id="${id}" class="file-section">
 <h2 class="file-heading">📁 ${escapeHtml(dir.name)}/ <span class="dim">${dir.files} files</span></h2>
-<p><a href="/${dir.token}" class="preview-btn">Browse ${escapeHtml(dir.name)} →</a></p>
+<p><a href="${bp(`/${dir.token}`)}" class="preview-btn">Browse ${escapeHtml(dir.name)} →</a></p>
 </section>`);
   }
 
@@ -172,7 +172,7 @@ async function renderHtmlInline(
   style="width:100%;border:1px solid var(--border);border-radius:6px;min-height:300px"
   onload="autoGrowIframe(this)"></iframe>
 <p class="html-controls">
-  <a href="/${token}/preview/${encodeURIComponent(fileName)}" target="_blank" class="preview-btn">Open as page →</a>
+  <a href="${bp(`/${token}/preview/${encodeURIComponent(fileName)}`)}" target="_blank" class="preview-btn">Open as page →</a>
   <a href="javascript:void(0)" onclick="var s=document.getElementById('${sourceId}');s.style.display=s.style.display==='none'?'block':'none'">View source</a>
 </p>
 <pre id="${sourceId}" style="display:none"><code>${escapeHtml(html)}</code></pre>
@@ -201,7 +201,7 @@ function rewriteHtmlUrls(
       }
     }
     if (ownerToken) {
-      return `${attr}="/${ownerToken}/file/${encodeURIComponent(fileName)}/raw"`;
+      return `${attr}="${bp(`/${ownerToken}/file/${encodeURIComponent(fileName)}/raw`)}"`;
     }
     return match;
   });
