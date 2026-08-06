@@ -110,11 +110,9 @@ async function renderFileInline(
     return renderCsv(text);
   }
 
-  // HTML — show source + preview button
+  // HTML — render in sandboxed iframe with auto-height
   if (fileExt === "html" || fileExt === "htm") {
-    const previewBtn = `<p><a href="/${token}/preview/${encodeURIComponent(child.name)}" target="_blank" class="preview-btn">Live preview →</a></p>`;
-    const codeHtml = await renderCode(text, "html");
-    return previewBtn + codeHtml;
+    return renderHtmlInline(token, child.name, text, treeMap);
   }
 
   // YAML — highlighted
@@ -140,3 +138,72 @@ function base64(buf: ArrayBuffer): string {
 function slugify(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
 }
+
+/** Render an HTML file inline in a sandboxed iframe with auto-height.
+ *
+ *  - Rewrites relative URLs to waggle file routes (CSS/JS/images load)
+ *  - Uses srcdoc + sandbox so the HTML can't break the viewer's CSS/JS
+ *  - Auto-grows the iframe to fit content
+ *  - "View source" toggle shows the raw HTML as code
+ *  - "Open as page" link opens the full preview in a new tab
+ */
+async function renderHtmlInline(
+  token: string,
+  fileName: string,
+  html: string,
+  treeMap: Map<string, string>,
+): Promise<string> {
+  // Rewrite relative URLs (same logic as preview.ts)
+  const basePath = fileName.includes("/")
+    ? fileName.slice(0, fileName.lastIndexOf("/") + 1)
+    : "";
+  const rewritten = rewriteHtmlUrls(html, basePath, treeMap);
+
+  // Escape for srcdoc attribute (escape quotes and ampersands)
+  const srcdoc = rewritten
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;");
+
+  const iframeId = `iframe-${slugify(fileName)}`;
+  const sourceId = `source-${slugify(fileName)}`;
+
+  return `<div class="html-inline">
+<iframe id="${iframeId}" srcdoc="${srcdoc}" sandbox="allow-scripts allow-same-origin"
+  style="width:100%;border:1px solid var(--border);border-radius:6px;min-height:300px"
+  onload="autoGrowIframe(this)"></iframe>
+<p class="html-controls">
+  <a href="/${token}/preview/${encodeURIComponent(fileName)}" target="_blank" class="preview-btn">Open as page →</a>
+  <a href="javascript:void(0)" onclick="var s=document.getElementById('${sourceId}');s.style.display=s.style.display==='none'?'block':'none'">View source</a>
+</p>
+<pre id="${sourceId}" style="display:none"><code>${escapeHtml(html)}</code></pre>
+</div>`;
+}
+
+/** Rewrite relative URLs in HTML to waggle file routes. */
+function rewriteHtmlUrls(
+  html: string,
+  basePath: string,
+  treeMap: Map<string, string>,
+): string {
+  return html.replace(/(href|src)=["']([^"']+)["']/g, (match, attr, url) => {
+    if (/^(https?:|\/\/|data:|mailto:|#)/.test(url)) return match;
+    const cleanUrl = url.split("?")[0].split("#")[0];
+    // Find owning token in tree map
+    let ownerToken: string | undefined;
+    const fileName = cleanUrl.includes("/")
+      ? cleanUrl.slice(cleanUrl.lastIndexOf("/") + 1)
+      : cleanUrl;
+    ownerToken = treeMap.get(cleanUrl);
+    if (!ownerToken) {
+      for (const [path, t] of treeMap) {
+        if (path === cleanUrl || path.endsWith("/" + cleanUrl)) { ownerToken = t; break; }
+        if (path === fileName) { ownerToken = t; break; }
+      }
+    }
+    if (ownerToken) {
+      return `${attr}="/${ownerToken}/file/${encodeURIComponent(fileName)}/raw"`;
+    }
+    return match;
+  });
+}
+

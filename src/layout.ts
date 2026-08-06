@@ -114,6 +114,9 @@ export function page(title: string, body: string, sidebar = "", breadcrumbs = ""
   .scroll-nav .nav-link { color:var(--fg); display:block; padding:0.15rem 0.3rem; border-radius:3px; }
   .scroll-nav .nav-link:hover { background:var(--bg-alt); text-decoration:none; }
   .scroll-nav .nav-link.active { background:var(--accent); color:var(--bg); }
+  .html-inline { margin:0.5rem 0; }
+  .html-controls { margin:0.3rem 0; font-size:0.85rem; }
+  .html-controls a { margin-right:1rem; }
 
   /* JSON highlighting */
   .json-key { color:var(--accent); }
@@ -180,6 +183,14 @@ ${body}
     }, { rootMargin: '-20% 0px -70% 0px' });
     sections.forEach(function(s) { observer.observe(s.el); });
   })();
+  // Auto-grow iframes to fit content
+  function autoGrowIframe(iframe) {
+    try {
+      var doc = iframe.contentDocument || iframe.contentWindow.document;
+      iframe.style.height = doc.body.scrollHeight + 'px';
+    } catch(e) {}
+  }
+  window.autoGrowIframe = autoGrowIframe;
 </script>
 </body>
 </html>`;
