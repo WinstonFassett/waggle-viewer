@@ -60,16 +60,22 @@ export async function serveTokenImage(
 ): Promise<{ bytes: ArrayBuffer; contentType: string } | null> {
   try {
     const info = await resolve(token);
-    if (!info.contentType.startsWith("image/")) return null;
-
-    // Query the manifest for the content blob ref (the actual image bytes)
     const bin = process.env.WAGGLE_BIN ?? "waggle";
+
+    // Query the manifest for the content blob ref and content type
+    // (resolve returns the text variant's content_type, not the image's)
     const result = await $`${bin} query --token ${token} --path /manifest/content`.quiet();
     const json = JSON.parse(result.stdout.toString());
-    const contentSha = json.result?.slice?.sha256;
+    const content = json.result?.slice;
+    const contentSha = content?.sha256;
+    const contentType = content?.content_type ?? info.contentType;
+
+    // Check if this is actually an image (from manifest, not resolve)
+    if (!contentType.startsWith("image/")) return null;
+
     if (contentSha) {
       const bytes = await readBlob(contentSha);
-      if (bytes) return { bytes, contentType: info.contentType };
+      if (bytes) return { bytes, contentType };
     }
 
     // Fallback: try variants (older manifest schema)
@@ -80,16 +86,16 @@ export async function serveTokenImage(
       const sha = v.body?.inline?.sha256 ?? v.body?.snapshot?.sha256;
       if (sha) {
         const bytes = await readBlob(sha);
-        if (bytes) return { bytes, contentType: info.contentType };
+        if (bytes) return { bytes, contentType };
       }
     }
 
     // Fallback: try target path (works if file still exists locally)
-    if (info.target.startsWith("file://")) {
+    if (info.target.startsWith("file://") || info.target.startsWith("/")) {
       const filePath = info.target.replace(/^file:\/\//, "");
       if (existsSync(filePath)) {
         const bytes = await Bun.file(filePath).arrayBuffer();
-        return { bytes, contentType: info.contentType };
+        return { bytes, contentType };
       }
     }
   } catch {

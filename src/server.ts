@@ -198,9 +198,25 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
     return serveFolder(token, ov);
   }
 
-  // Image token
+  // Image token — overview returns empty for images (waggle read returns null),
+  // so check the manifest content type via serveTokenImage
+  if (!ov.content_type && !ov.total_bytes) {
+    const img = await serveTokenImage(token);
+    if (img) {
+      if (raw) return new Response(img.bytes, { headers: { "content-type": img.contentType } });
+      return new Response(
+        page(`token ${token}`,
+          breadcrumbs(token) +
+          `<p class="meta"><span class="badge">${badgeLabel(img.contentType)}</span></p>` +
+          `<img src="${bp(`/${token}/raw`)}" style="max-width:100%;border-radius:6px">`),
+        { headers: { "content-type": "text/html; charset=utf-8" } },
+      );
+    }
+  }
+
+  // Image token (when overview has content_type from a different schema)
   if (ov.content_type?.startsWith("image/")) {
-    const img = await serveTokenImage(token, raw);
+    const img = await serveTokenImage(token);
     if (img) {
       if (raw) return new Response(img.bytes, { headers: { "content-type": img.contentType } });
       return new Response(
