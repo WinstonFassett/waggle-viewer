@@ -62,11 +62,20 @@ export async function serveTokenImage(
     const info = await resolve(token);
     if (!info.contentType.startsWith("image/")) return null;
 
-    // Query the manifest for the blob ref
+    // Query the manifest for the content blob ref (the actual image bytes)
     const bin = process.env.WAGGLE_BIN ?? "waggle";
-    const result = await $`${bin} query --token ${token} --path /manifest/variants`.quiet();
+    const result = await $`${bin} query --token ${token} --path /manifest/content`.quiet();
     const json = JSON.parse(result.stdout.toString());
-    const variants = json.result?.slice ?? [];
+    const contentSha = json.result?.slice?.sha256;
+    if (contentSha) {
+      const bytes = await readBlob(contentSha);
+      if (bytes) return { bytes, contentType: info.contentType };
+    }
+
+    // Fallback: try variants (older manifest schema)
+    const variantsResult = await $`${bin} query --token ${token} --path /manifest/variants`.quiet();
+    const variantsJson = JSON.parse(variantsResult.stdout.toString());
+    const variants = variantsJson.result?.slice ?? [];
     for (const v of variants) {
       const sha = v.body?.inline?.sha256 ?? v.body?.snapshot?.sha256;
       if (sha) {
