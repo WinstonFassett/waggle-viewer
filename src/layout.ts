@@ -157,6 +157,13 @@ export function page(title: string, body: string, sidebar = "", breadcrumbs = ""
   .file-heading a { color:var(--fg); text-decoration:none; }
   .file-heading a:hover { color:var(--accent); text-decoration:underline; }
 
+  /* Token tree (dashboard) */
+  .token-tree, .token-tree ul { list-style:none; padding-left:0; }
+  .token-tree ul { padding-left:0.5rem; margin:0; }
+  .token-tree li { padding:0.2rem 0; font-size:0.85rem; }
+  .token-tree li a { color:var(--accent); font-weight:500; }
+  .token-tree .badge { margin-left:0.3rem; }
+
   /* Shiki code blocks */
   .shiki { background:var(--bg-alt) !important; padding:1rem; border-radius:6px; overflow:auto; }
   .shiki code { font-size:0.85rem; }

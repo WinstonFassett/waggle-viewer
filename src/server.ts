@@ -100,15 +100,80 @@ async function dashboard(): Promise<Response> {
   } catch {
     // waggle not available
   }
-  const items = tokens.slice(0, 20).map((t) => {
-    const date = new Date(t.minted_at * 1000).toLocaleString();
-    const tags = Object.entries(t.tags).map(([k, v]) => `<span class="badge">${escapeHtml(k)}=${escapeHtml(v)}</span>`).join("");
-    return `<li><a href="${bp(`/${t.token}`)}">${t.token}</a> <span class="dim">${escapeHtml(t.target)}</span> <span class="dim">${date}</span> ${tags}</li>`;
-  }).join("");
+
+  // Build a tree from file paths: tokens whose target is a subdirectory
+  // of another token's target are children. Tagged tokens (name=foo) are roots.
+  const tree = buildTokenTree(tokens.slice(0, 50));
+  const items = renderTokenTree(tree);
   return new Response(
-    page("waggle viewer", `<h1>waggle viewer</h1><p class="dim">${tokens.length} tokens</p><ul>${items}</ul>`),
+    page("waggle viewer", `<h1>waggle viewer</h1><p class="dim">${tokens.length} tokens</p><ul class="token-tree">${items}</ul>`),
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
+}
+
+interface TokenNode {
+  token: string;
+  target: string;
+  tags: Record<string, string>;
+  minted_at: number;
+  children: TokenNode[];
+  depth: number;
+}
+
+/** Build a tree from flat token list by matching file path prefixes. */
+function buildTokenTree(tokens: { token: string; target: string; tags: Record<string, string>; minted_at: number }[]): TokenNode[] {
+  // Normalize targets to comparable paths
+  const normalized = tokens.map((t) => ({
+    ...t,
+    path: t.target.replace(/^file:\/\//, "").replace(/\/+$/, ""),
+  }));
+
+  // Sort by path length ascending so parents come before children
+  normalized.sort((a, b) => a.path.length - b.path.length);
+
+  const nodes: TokenNode[] = [];
+  const allNodes: TokenNode[] = [];
+
+  for (const t of normalized) {
+    const node: TokenNode = { ...t, children: [], depth: 0 };
+    allNodes.push(node);
+
+    // Find parent: the longest path that is a prefix of this path
+    let parent: TokenNode | undefined;
+    for (const candidate of allNodes) {
+      if (candidate === node) continue;
+      if (t.path.startsWith(candidate.path + "/")) {
+        if (!parent || candidate.path.length > parent.path.length) {
+          parent = candidate;
+        }
+      }
+    }
+    if (parent) {
+      node.depth = parent.depth + 1;
+      parent.children.push(node);
+    } else {
+      nodes.push(node);
+    }
+  }
+
+  // Sort roots newest first, children alphabetically
+  nodes.sort((a, b) => b.minted_at - a.minted_at);
+  for (const n of allNodes) {
+    n.children.sort((a, b) => a.target.localeCompare(b.target));
+  }
+  return nodes;
+}
+
+/** Render the token tree as nested HTML. */
+function renderTokenTree(nodes: TokenNode[]): string {
+  return nodes.map((n) => {
+    const date = new Date(n.minted_at * 1000).toLocaleDateString();
+    const tags = Object.entries(n.tags).map(([k, v]) => `<span class="badge">${escapeHtml(k)}=${escapeHtml(v)}</span>`).join("");
+    const name = n.tags.name || n.path.split("/").pop() || n.token;
+    const indent = n.depth > 0 ? ` style="padding-left:${n.depth * 1.2}rem"` : "";
+    const childHtml = n.children.length ? renderTokenTree(n.children) : "";
+    return `<li${indent}><a href="${bp(`/${n.token}`)}">${escapeHtml(name)}</a> <span class="dim">${escapeHtml(n.token)}</span> ${tags} <span class="dim">${date}</span>${childHtml ? `<ul>${childHtml}</ul>` : ""}</li>`;
+  }).join("");
 }
 
 function health(): Response {
