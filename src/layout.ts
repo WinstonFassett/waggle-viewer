@@ -153,6 +153,10 @@ export function page(title: string, body: string, sidebar = "", breadcrumbs = ""
     color:var(--bg); border-radius:4px; text-decoration:none; font-weight:500; margin:0.5rem 0; }
   .preview-btn:hover { text-decoration:none; opacity:0.9; }
 
+  /* File heading links */
+  .file-heading a { color:var(--fg); text-decoration:none; }
+  .file-heading a:hover { color:var(--accent); text-decoration:underline; }
+
   /* Shiki code blocks */
   .shiki { background:var(--bg-alt) !important; padding:1rem; border-radius:6px; overflow:auto; }
   .shiki code { font-size:0.85rem; }

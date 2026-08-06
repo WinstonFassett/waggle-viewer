@@ -53,7 +53,7 @@ export async function renderFolder(
     }
 
     sections.push(`<section id="${id}" class="file-section">
-<h2 class="file-heading">${escapeHtml(child.name)} <span class="badge">${badgeLabel(child.content_type)}</span> <span class="dim">${formatBytes(child.bytes)}</span></h2>
+<h2 class="file-heading"><a href="#${id}">${escapeHtml(child.name)}</a> <span class="badge">${badgeLabel(child.content_type)}</span> <span class="dim">${formatBytes(child.bytes)}</span></h2>
 ${content}
 </section>`);
   }
