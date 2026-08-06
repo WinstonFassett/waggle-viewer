@@ -51,8 +51,12 @@ function rewriteUrls(md: string, ctx: MarkdownContext): string {
 
 /** Resolve a relative URL to a waggle file route. */
 function resolveUrl(url: string, token: string, treeMap?: Map<string, string>): string {
-  // Skip absolute URLs, data URIs, anchors, and already-resolved waggle routes
-  if (/^(https?:|\/\/|data:|mailto:|#|\/[A-Za-z0-9]{6,12})/.test(url)) return url;
+  // Skip absolute URLs, data URIs, anchors
+  if (/^(https?:|\/\/|data:|mailto:|#)/.test(url)) return url;
+
+  // Already-resolved waggle routes (/<token> or /<token>/raw, /<token>/file/..., etc.)
+  // Apply basePath so they work behind a reverse proxy
+  if (/^\/[A-Za-z0-9]{6,12}(\/|$)/.test(url)) return bp(url);
 
   const cleanUrl = url.split("?")[0].split("#")[0];
 
