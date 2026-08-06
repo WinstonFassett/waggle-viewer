@@ -103,6 +103,18 @@ export function page(title: string, body: string, sidebar = "", breadcrumbs = ""
   /* Evidence blocks */
   .evidence { margin:0.8rem 0; padding:0.6rem 0.8rem; background:var(--bg-alt); border-radius:6px; }
 
+  /* Single-pane folder view */
+  .file-section { margin-bottom:3rem; padding-bottom:2rem; border-bottom:1px solid var(--border); }
+  .file-section:last-child { border-bottom:none; }
+  .file-heading { font-size:1rem; font-weight:600; margin-top:0; padding-top:1rem;
+    border-top:1px solid var(--border); scroll-margin-top:1rem; }
+  .file-heading:first-child { border-top:none; }
+  .scroll-nav { list-style:none; padding-left:0; }
+  .scroll-nav li { padding:0.15rem 0; font-size:0.8rem; }
+  .scroll-nav .nav-link { color:var(--fg); display:block; padding:0.15rem 0.3rem; border-radius:3px; }
+  .scroll-nav .nav-link:hover { background:var(--bg-alt); text-decoration:none; }
+  .scroll-nav .nav-link.active { background:var(--accent); color:var(--bg); }
+
   /* JSON highlighting */
   .json-key { color:var(--accent); }
   .json-str { color:var(--str); }
@@ -147,6 +159,28 @@ ${breadcrumbHtml}
 ${body}
 </main>
 </div>
+<script>
+  // Scroll spy: highlight current section in nav
+  (function() {
+    var links = document.querySelectorAll('.scroll-nav .nav-link');
+    if (!links.length) return;
+    var sections = [];
+    links.forEach(function(link) {
+      var target = document.getElementById(link.dataset.target);
+      if (target) sections.push({ el: target, link: link });
+    });
+    var observer = new IntersectionObserver(function(entries) {
+      entries.forEach(function(entry) {
+        if (entry.isIntersecting) {
+          links.forEach(function(l) { l.classList.remove('active'); });
+          var match = sections.find(function(s) { return s.el === entry.target; });
+          if (match) match.link.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-20% 0px -70% 0px' });
+    sections.forEach(function(s) { observer.observe(s.el); });
+  })();
+</script>
 </body>
 </html>`;
 }

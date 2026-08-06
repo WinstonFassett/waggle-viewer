@@ -29,6 +29,7 @@ import { renderJson, renderJsonPath } from "./render/json.ts";
 import { isCsv, renderCsv } from "./render/csv.ts";
 import { serveTokenImage, serveFolderImage } from "./render/image.ts";
 import { renderPreview } from "./render/preview.ts";
+import { renderFolder } from "./render/folder.ts";
 
 let currentToken = "";
 
@@ -182,10 +183,9 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
     { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
-// --- Folder view (NO redundant listing — shows README or summary) ---
+// --- Folder view (single-pane scroll — all files rendered inline) ---
 
 async function serveFolder(token: string, ov: WaggleOverview): Promise<Response> {
-  const sidebar = treeSidebar(ov, token);
   const bc = breadcrumbs(token);
   const meta = `<p class="meta"><span class="badge">folder</span> ${ov.files ?? 0} files, ${ov.subdirs ?? 0} subdirs · ${formatBytes(ov.total_bytes ?? 0)}</p>`;
 
@@ -195,35 +195,11 @@ async function serveFolder(token: string, ov: WaggleOverview): Promise<Response>
     ? `<a class="preview-btn" href="/${token}/preview" target="_blank">Preview site →</a>`
     : "";
 
-  // Check for README.md — render it as the main content
-  const readme = (ov.children ?? []).find((c) => c.name.toLowerCase() === "readme.md" || c.name.toLowerCase() === "readme");
-  if (readme) {
-    try {
-      const text = await waggleReadFile(token, readme.name);
-      const treeMap = new Map<string, string>();
-      try { await buildTreeMap(token, "", treeMap); } catch {}
-      const html = await renderMarkdown(text, { token, treeMap });
-      return new Response(page(`folder ${token}`, bc + meta + previewBtn + html, sidebar),
-        { headers: { "content-type": "text/html; charset=utf-8" } });
-    } catch {
-      // fall through to summary
-    }
-  }
-
-  // No README — show a compact summary (NOT a duplicate of the sidebar)
-  const fileSummary = (ov.children ?? []).map((c) =>
-    `<li><a href="/${token}/file/${encodeURIComponent(c.name)}">${escapeHtml(c.name)}</a> <span class="dim">${formatBytes(c.bytes)}</span> <span class="badge">${badgeLabel(c.content_type)}</span></li>`
-  ).join("");
-  const dirSummary = (ov.dirs ?? []).map((d) =>
-    `<li><a href="/${d.token}">${escapeHtml(d.name)}/</a> <span class="dim">${d.files} files</span></li>`
-  ).join("");
+  // Render all files inline on one scrollable page
+  const { html, nav } = await renderFolder(token, ov);
 
   return new Response(
-    page(`folder ${token}`,
-      bc + meta + previewBtn +
-      (fileSummary ? `<h3>files</h3><ul>${fileSummary}</ul>` : "") +
-      (dirSummary ? `<h3>subdirectories</h3><ul>${dirSummary}</ul>` : ""),
-      sidebar),
+    page(`folder ${token}`, bc + meta + previewBtn + html, nav),
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }
