@@ -137,9 +137,18 @@ export async function find(query: string = ""): Promise<WaggleCandidate[]> {
 
 export async function overview(token: string): Promise<WaggleOverview> {
   const bin = wagglePath();
-  const result = await $`${bin} read --token ${token}`.quiet();
-  const json = JSON.parse(result.stdout.toString());
-  return json.result ?? {};
+  const proc = Bun.spawn([bin, "read", "--token", token], { stdout: "pipe", stderr: "pipe" });
+  const stdout = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+  if (exitCode !== 0 && !stdout) {
+    throw new Error(`waggle read failed (exit ${exitCode})`);
+  }
+  try {
+    const json = JSON.parse(stdout);
+    return json.result ?? {};
+  } catch {
+    return {};
+  }
 }
 
 export async function readFile(token: string, fileName: string): Promise<string> {
