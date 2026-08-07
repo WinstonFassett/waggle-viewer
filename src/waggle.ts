@@ -179,6 +179,68 @@ export async function search(token: string, pattern: string): Promise<WaggleSear
   return json.result?.matches ?? [];
 }
 
+export async function queryPath(token: string, path: string): Promise<unknown> {
+  const bin = wagglePath();
+  try {
+    const result = await $`${bin} query --token ${token} --path ${path}`.quiet();
+    const json = JSON.parse(result.stdout.toString());
+    const data = json.result;
+    if (data && typeof data === "object") {
+      return data.slice ?? data;
+    }
+    return data;
+  } catch {
+    return null;
+  }
+}
+
+export interface WaggleFunnel {
+  children?: number;
+  resolves?: number;
+  runs?: number;
+  stages?: Record<string, number>;
+  outcome?: string;
+}
+
+export async function funnel(token: string): Promise<WaggleFunnel> {
+  const bin = wagglePath();
+  try {
+    const result = await $`${bin} funnel --token ${token}`.quiet();
+    const json = JSON.parse(result.stdout.toString());
+    const data = json.result ?? {};
+    return {
+      children: Array.isArray(data.children) ? data.children.length : (typeof data.children === "number" ? data.children : undefined),
+      stages: data.stages,
+      outcome: data.outcome,
+    };
+  } catch {
+    return {};
+  }
+}
+
+export interface WaggleMap {
+  disposition?: string;
+  replacement?: string;
+  here?: string;
+}
+
+export async function map(token: string): Promise<WaggleMap> {
+  const bin = wagglePath();
+  try {
+    const result = await $`${bin} map --token ${token}`.quiet();
+    const json = JSON.parse(result.stdout.toString());
+    const data = json.result ?? {};
+    const here = data.here ?? "";
+    const disposition = here.includes("active") ? "active"
+      : here.includes("supersede") ? "superseded"
+      : here.includes("revoke") ? "revoked"
+      : undefined;
+    return { disposition, here };
+  } catch {
+    return {};
+  }
+}
+
 export function blobPath(sha256: string): string {
   const home = process.env.HOME ?? "/tmp";
   return `${home}/.waggle/blobs/${sha256.slice(0, 2)}/${sha256}`;
