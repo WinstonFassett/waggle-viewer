@@ -30,6 +30,7 @@ import { isCsv, renderCsv } from "./render/csv.ts";
 import { serveTokenImage, serveFolderImage } from "./render/image.ts";
 import { renderPreview } from "./render/preview.ts";
 import { renderFolder } from "./render/folder.ts";
+import { getLineage, renderLineageInfo, renderLineageBreadcrumb } from "./lineage.ts";
 
 let currentToken = "";
 
@@ -204,10 +205,15 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
     const img = await serveTokenImage(token);
     if (img) {
       if (raw) return new Response(img.bytes, { headers: { "content-type": img.contentType } });
+      const lineage = await getLineage(token);
+      const lineageHtml = renderLineageInfo(lineage);
+      const lineageBreadcrumb = await renderLineageBreadcrumb(token);
       return new Response(
         page(`token ${token}`,
           breadcrumbs(token) +
+          lineageBreadcrumb +
           `<p class="meta"><span class="badge">${badgeLabel(img.contentType)}</span></p>` +
+          lineageHtml +
           `<img src="${bp(`/${token}/raw`)}" style="max-width:100%;border-radius:6px">`),
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
@@ -219,10 +225,15 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
     const img = await serveTokenImage(token);
     if (img) {
       if (raw) return new Response(img.bytes, { headers: { "content-type": img.contentType } });
+      const lineage = await getLineage(token);
+      const lineageHtml = renderLineageInfo(lineage);
+      const lineageBreadcrumb = await renderLineageBreadcrumb(token);
       return new Response(
         page(`token ${token}`,
           breadcrumbs(token) +
+          lineageBreadcrumb +
           `<p class="meta"><span class="badge">${badgeLabel(ov.content_type)}</span> ${formatBytes(ov.total_bytes ?? 0)}</p>` +
+          lineageHtml +
           `<img src="${bp(`/${token}/raw`)}" style="max-width:100%;border-radius:6px">`),
         { headers: { "content-type": "text/html; charset=utf-8" } },
       );
@@ -251,23 +262,26 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
   const sidebar = outlineSidebar(ov, ov.total_lines) || symbolSidebar(ov);
   const bc = breadcrumbs(token);
   const meta = `<p class="meta"><span class="badge">${badgeLabel(ct)}</span> ${formatBytes(ov.total_bytes ?? 0)}</p>`;
+  const lineage = await getLineage(token);
+  const lineageHtml = renderLineageInfo(lineage);
+  const lineageBreadcrumb = await renderLineageBreadcrumb(token);
 
   if (ct === "text/markdown") {
     const html = await renderMarkdown(text, { token });
-    return new Response(page(`token ${token}`, bc + meta + html, sidebar),
+    return new Response(page(`token ${token}`, bc + lineageBreadcrumb + meta + lineageHtml + html, sidebar),
       { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (ct === "application/json") {
-    return new Response(page(`token ${token}`, bc + meta + renderJson(text), sidebar),
+    return new Response(page(`token ${token}`, bc + lineageBreadcrumb + meta + lineageHtml + renderJson(text), sidebar),
       { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   if (isCsv(text)) {
-    return new Response(page(`token ${token}`, bc + meta + renderCsv(text), sidebar),
+    return new Response(page(`token ${token}`, bc + lineageBreadcrumb + meta + lineageHtml + renderCsv(text), sidebar),
       { headers: { "content-type": "text/html; charset=utf-8" } });
   }
   // Code / text
   const codeHtml = await renderCode(text, fileExt);
-  return new Response(page(`token ${token}`, bc + meta + codeHtml, sidebar),
+  return new Response(page(`token ${token}`, bc + lineageBreadcrumb + meta + lineageHtml + codeHtml, sidebar),
     { headers: { "content-type": "text/html; charset=utf-8" } });
 }
 
@@ -276,6 +290,9 @@ async function serveToken(token: string, raw: boolean): Promise<Response> {
 async function serveFolder(token: string, ov: WaggleOverview): Promise<Response> {
   const bc = breadcrumbs(token);
   const meta = `<p class="meta"><span class="badge">folder</span> ${ov.files ?? 0} files, ${ov.subdirs ?? 0} subdirs · ${formatBytes(ov.total_bytes ?? 0)}</p>`;
+  const lineage = await getLineage(token);
+  const lineageHtml = renderLineageInfo(lineage);
+  const lineageBreadcrumb = await renderLineageBreadcrumb(token);
 
   // Check for index.html (offer preview)
   const hasIndex = (ov.children ?? []).some((c) => c.name === "index.html");
@@ -287,7 +304,7 @@ async function serveFolder(token: string, ov: WaggleOverview): Promise<Response>
   const { html, nav } = await renderFolder(token, ov);
 
   return new Response(
-    page(`folder ${token}`, bc + meta + previewBtn + html, nav),
+    page(`folder ${token}`, bc + lineageBreadcrumb + meta + lineageHtml + previewBtn + html, nav),
     { headers: { "content-type": "text/html; charset=utf-8" } },
   );
 }
