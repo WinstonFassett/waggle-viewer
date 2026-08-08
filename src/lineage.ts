@@ -104,7 +104,7 @@ export function renderLineageInfo(lineage: TokenLineage): string {
   return html;
 }
 
-export async function renderLineageBreadcrumb(token: string, maxLength = 5): Promise<string> {
+export async function renderLineageBreadcrumb(token: string, maxLength = 20): Promise<string> {
   const chain = await getLineageChain(token, maxLength);
   if (chain.length <= 1) return "";
 
