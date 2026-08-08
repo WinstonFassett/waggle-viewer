@@ -1,4 +1,4 @@
-import { queryPath, funnel, map, type WaggleFunnel, type WaggleMap } from "./waggle.ts";
+import { queryPath, funnel, map, overview, readFile, type WaggleFunnel, type WaggleMap } from "./waggle.ts";
 import { escapeHtml } from "./util.ts";
 import { bp } from "./layout.ts";
 
@@ -9,14 +9,37 @@ export interface TokenLineage {
   funnel: WaggleFunnel;
   disposition?: string;
   replacement?: string;
+  title?: string;
+}
+
+async function getTokenTitle(token: string): Promise<string | undefined> {
+  try {
+    const ov = await overview(token);
+    // If it's a folder with handoff.md, read it
+    if (ov.children && ov.children.some(c => c.name === "handoff.md")) {
+      const md = await readFile(token, "handoff.md");
+      // Extract H1: # Work complete — Built tabs.html
+      const match = md.match(/^#\s+(.+)$/m);
+      if (match) return match[1].trim();
+    }
+    // If it's a markdown file, try outline
+    if (ov.outline && ov.outline.length > 0) {
+      const h1 = ov.outline.find(e => e.level === 1);
+      if (h1) return h1.heading;
+    }
+    return undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export async function getLineage(token: string): Promise<TokenLineage> {
-  const [parentResult, mintedResult, funnelResult, mapResult] = await Promise.all([
+  const [parentResult, mintedResult, funnelResult, mapResult, titleResult] = await Promise.all([
     queryPath(token, "/manifest/parent"),
     queryPath(token, "/manifest/minted_at"),
     funnel(token),
     map(token),
+    getTokenTitle(token),
   ]);
 
   return {
@@ -26,6 +49,7 @@ export async function getLineage(token: string): Promise<TokenLineage> {
     funnel: funnelResult,
     disposition: mapResult.disposition,
     replacement: mapResult.replacement,
+    title: titleResult,
   };
 }
 
@@ -85,8 +109,10 @@ export async function renderLineageBreadcrumb(token: string, maxLength = 5): Pro
   if (chain.length <= 1) return "";
 
   const parts = chain.reverse().map((lineage) => {
-    return `<a href="${bp(`/${lineage.token}`)}">${escapeHtml(lineage.token)}</a>`;
-  }).join(`<span class="sep">←</span>`);
+    const label = lineage.title || lineage.token;
+    const shortLabel = label.length > 60 ? label.slice(0, 57) + "..." : label;
+    return `<a href="${bp(`/${lineage.token}`)}" title="${escapeHtml(lineage.token)}">${escapeHtml(shortLabel)}</a>`;
+  }).join(`<span class="sep"> ← </span>`);
 
   return `<div class="lineage-breadcrumb" style="margin:1rem 0; padding:0.5rem; background:var(--bg-alt); border-radius:4px;"><strong>lineage:</strong> ${parts}</div>`;
 }
